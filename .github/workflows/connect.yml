@@ -140,6 +140,8 @@ jobs:
         run: |
           gh variable set AZURE_TENANT_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ vars.AZURE_TENANT_ID }}"
           gh variable set AZURE_CLIENT_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ steps.applicaiton.outputs.appId }}"
+          gh variable set AZURE_SUBSCRIPTION_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ inputs.subscription }}"
+          gh variable set AZURE_RESOURCE_GROUP_NAME -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ inputs.resourceGroup }}"
 
       - name: Write Summary
         run: |
