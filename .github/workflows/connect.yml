@@ -29,7 +29,7 @@ env:
 
 jobs:
   print:
-    name: Request Details
+    name: OIDC Connection Request
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +38,7 @@ jobs:
           echo "Triggered by: @${{ github.triggering_actor }}" >> $GITHUB_STEP_SUMMARY
 
   connect:
-    name: Connect OIDC
+    name: OIDC Connection
     runs-on: ubuntu-latest
     environment: default
 
@@ -54,7 +54,8 @@ jobs:
 
       - name: Validate Resource Group
         run: |
-          rg_output=$( az group show --subscription "${{ inputs.subscription }}" --name "${{ inputs.resourceGroup }}" 2>&1 )
+          set +e
+          rg_output=$( az group show --subscription "${{ inputs.subscription }}" --name "${{ inputs.resourceGroup }}" 2>&1 ); set -e
 
           if [[ $rg_output == *"ResourceGroupNotFound"* ]]; then
               echo "::error::$rg_output" | head -n 1
@@ -65,7 +66,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
         run: |
-          repo_output=$( gh repo view "${{ github.repository_owner }}/${{ inputs.repository }}" --json id,url 2>&1 )
+          set +e
+          repo_output=$( gh repo view "${{ github.repository_owner }}/${{ inputs.repository }}" --json id,url 2>&1 ); set -e
 
           if [[ $repo_output == *"Could not resolve to a Repository"* ]]; then
               echo "::error::$repo_output"
@@ -88,7 +90,8 @@ jobs:
               fi
           done
 
-      - run: |
+      - name: Write Summary
+        run: |
           echo "#### Successfully connected repository [${{inputs.repository}}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs.resourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
           echo "To use..." >> $GITHUB_STEP_SUMMARY
 
