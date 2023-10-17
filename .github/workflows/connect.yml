@@ -24,7 +24,12 @@ run-name: "Repository: '${{ inputs.repository }}' Resource Group: '${{ inputs.re
 
 env:
   DESCRIPTION: Creates a service principal and uses it to configure a repository to enable deployments to azure
+
+  OIDC_REPOSIOTRY: ${{ github.repository_owner }}/${{ inputs.repository }}
   OIDC_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository_owner }}/${{ inputs.repository }}
+
+  AZURE_RBAC_ROLE: Contributor
+  AZURE_RESOURCE_GROUP_ID: /subscriptions/${{ inputs.subscription }}/resourceGroups/${{ inputs.resourceGroup }}
   AZURE_RESOURCE_GROUP_URL: https://portal.azure.com/#@${{ vars.AZURE_TENANT_ID }}/resource/subscriptions/${{ inputs.subscription }}/resourceGroups/${{ inputs.resourceGroup }}/overview
 
 jobs:
@@ -68,7 +73,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
         run: |
           set +e
-          repo_output=$( gh repo view "${{ github.repository_owner }}/${{ inputs.repository }}" --json id,url 2>&1 )
+          repo_output=$( gh repo view "${{ env.OIDC_REPOSIOTRY }}" --json id,url 2>&1 )
           repo_output_status=$?
 
           if [ $repo_output_status -ne 0 ]; then
@@ -77,8 +82,8 @@ jobs:
           fi
 
           set -e
-          repo_secrets=$( gh secret list -R "${{ github.repository_owner }}/${{ inputs.repository }}" )
-          repo_variables=$( gh variable list -R "${{ github.repository_owner }}/${{ inputs.repository }}" )
+          repo_secrets=$( gh secret list -R "${{ env.OIDC_REPOSIOTRY }}" )
+          repo_variables=$( gh variable list -R "${{ env.OIDC_REPOSIOTRY }}" )
 
           for VARIABLE in "AZURE_TENANT_ID" "AZURE_CLIENT_ID"
           do
@@ -91,9 +96,54 @@ jobs:
               fi
           done
 
+      - name: Create Azure AD Applicaiton
+        id: applicaiton
+        run: |
+          application_name="Dev Platform OIDC ${{ inputs.repository }}"
+
+          application=$(az ad app create --display-name $application_name)
+
+          application_object_id=$(jq -r '.id' <<< "$application")
+          application_client_id=$(jq -r '.appId' <<< "$application")
+
+          echo "name=$application_name" >> $GITHUB_OUTPUT
+          echo "id=$application_object_id" >> $GITHUB_OUTPUT
+          echo "appId=$application_client_id" >> $GITHUB_OUTPUT
+
+      - name: Create Service Principal
+        id: principal
+        run: |
+          service_principal=$(az ad sp create --id ${{ steps.applicaiton.outputs.id }})
+          service_principal_object_id=$(jq -r '.id' <<< "$service_principal")
+
+          echo "id=$service_principal_object_id" >> $GITHUB_OUTPUT
+
+      - name: Create OIDC Creds
+        run: |
+          credentials_name="DevPlatformOIDC-${{ inputs.repository }}"
+
+          az rest --method POST \
+              --uri "https://graph.microsoft.com/beta/applications/${{ steps.applicaiton.outputs.id }}/federatedIdentityCredentials" \
+              --body '{"name":"'$credentials_name'","issuer":"https://token.actions.githubusercontent.com","subject":"repo:'${{ env.OIDC_REPOSIOTRY }}'","description":"'${{ steps.applicaiton.outputs.name }}'","audiences":["api://AzureADTokenExchange"]}'
+
+      - name: Add Role Assignment
+        run: |
+          az role assignment create \
+              --scope ${{ env.AZURE_RESOURCE_GROUP_ID }} \
+              --role ${{ env.AZURE_RBAC_ROLE }} \
+              --assignee-object-id ${{ steps.principal.outputs.id }} \
+              --assignee-principal-type ServicePrincipal
+
+      - name: Set Repository Variables
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+        run: |
+          gh variable set AZURE_TENANT_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ vars.AZURE_TENANT_ID }}"
+          gh variable set AZURE_CLIENT_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ steps.applicaiton.outputs.appId }}"
+
       - name: Write Summary
         run: |
-          echo "#### Successfully connected repository [${{inputs.repository}}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs.resourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
+          echo "#### Successfully connected repository [${{ env.OIDC_REPOSIOTRY }}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs.resourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
           echo "To use..." >> $GITHUB_STEP_SUMMARY
 
       - name: Done
