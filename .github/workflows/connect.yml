@@ -1,28 +1,49 @@
 name: Connect OIDC
 
 env:
-  description: Connects a service principal to enable deployments to azure
+  description: Creates a service principal and uses it to configure a repository to enable deployments to azure
 
 on:
   workflow_dispatch:
     inputs:
-      repositoryUri:
-        description: The repository's git url
+      repository:
+        description: Name of the repository
+        required: true
+        type: string
+      subscription:
+        description: Azure subscription id (guid)
+        required: true
+        type: string
+      resourceGroup:
+        description: Name of the resource group
         required: true
         type: string
 
 jobs:
   build:
-    environment: default
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Try reading secret
-        run: echo ${{ secrets.SUPER_SECRET_AUTH }}
+    environment: default
 
-      - name: Read input
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Az CLI login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Validate Resource Group
         run: |
-          echo ${{ inputs.repositoryUri }}
+          az group show --subscripiton ${{ inputs.subscription }} -n ${{ inputs.resourceGroup }}
+
+      - name: Validate Repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+        run: |
+          gh repo view ${{ github.repository_owner }}/${{ inputs.repository }} --json id,url
 
       - name: Done
         run: |
