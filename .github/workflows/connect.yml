@@ -20,6 +20,8 @@ on:
         required: true
         type: string
 
+run-name: Connect ${{ inputs.repository }} <-> ${{ inputs.resourceGroup }}
+
 env:
   DESCRIPTION: Creates a service principal and uses it to configure a repository to enable deployments to azure
   OIDC_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository_owner }}/${{ inputs.repository }}
