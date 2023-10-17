@@ -20,7 +20,7 @@ on:
         required: true
         type: string
 
-run-name: Connect ${{ inputs.repository }} <-> ${{ inputs.resourceGroup }}
+run-name: Connect repository ${{ inputs.repository }} to resource group ${{ inputs.resourceGroup }}
 
 env:
   DESCRIPTION: Creates a service principal and uses it to configure a repository to enable deployments to azure
@@ -35,7 +35,7 @@ jobs:
     steps:
       - run: |
           echo "### Connecting repository [${{inputs.repository}}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs.resourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
-          echo "Triggered by: ${{ github.triggering_actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered by: @${{ github.triggering_actor }}" >> $GITHUB_STEP_SUMMARY
 
   connect:
     name: Connect OIDC
