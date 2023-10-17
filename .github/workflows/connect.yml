@@ -59,7 +59,8 @@ jobs:
           rg_output_status=$?
 
           if [ $rg_output_status -ne 0 ]; then
-              echo -e "::error::$rg_output"; exit $rg_output_status
+              while IFS= read -r line ; do echo "::error::$line"; done <<< "$rg_output"
+              exit $rg_output_status
           fi
 
       - name: Validate Repository
@@ -71,7 +72,8 @@ jobs:
           repo_output_status=$?
 
           if [ $repo_output_status -ne 0 ]; then
-              echo -e "::error::$repo_output"; exit $repo_output_status
+              while IFS= read -r line ; do echo "::error::$line"; done <<< "$repo_output"
+              exit $repo_output_status
           fi
 
           set -e
