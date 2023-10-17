@@ -27,6 +27,7 @@ env:
 
 jobs:
   print:
+    name: Request Details
     runs-on: ubuntu-latest
 
     steps:
@@ -35,6 +36,7 @@ jobs:
           echo "Triggered by: ${{ github.triggering_actor }}" >> $GITHUB_STEP_SUMMARY
 
   connect:
+    name: Connect OIDC
     runs-on: ubuntu-latest
     environment: default
 
@@ -50,7 +52,7 @@ jobs:
 
       - name: Validate Resource Group
         run: |
-          az group show --subscripiton ${{ inputs.subscription }} -n ${{ inputs.resourceGroup }}
+          az group show --subscription ${{ inputs.subscription }} -n ${{ inputs.resourceGroup }}
 
       - name: Validate Repository
         env:
