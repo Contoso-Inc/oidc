@@ -55,11 +55,11 @@ jobs:
       - name: Validate Resource Group
         run: |
           set +e
-          rg_output=$( az group show --subscription "${{ inputs.subscription }}" --name "${{ inputs.resourceGroup }}" 2>&1 ); set -e
+          rg_output=$( az group show --subscription "${{ inputs.subscription }}" --name "${{ inputs.resourceGroup }}" 2>&1 )
+          rg_output_status=$?
 
-          if [[ $rg_output == *"ResourceGroupNotFound"* ]]; then
-              echo "::error::$rg_output" | head -n 1
-              exit 1
+          if [ $rg_output_status -ne 0 ]; then
+              echo "::error::$rg_output"; exit $rg_output_status
           fi
 
       - name: Validate Repository
@@ -67,26 +67,25 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
         run: |
           set +e
-          repo_output=$( gh repo view "${{ github.repository_owner }}/${{ inputs.repository }}" --json id,url 2>&1 ); set -e
+          repo_output=$( gh repo view "${{ github.repository_owner }}/${{ inputs.repository }}" --json id,url 2>&1 )
+          repo_output_status=$?
 
-          if [[ $repo_output == *"Could not resolve to a Repository"* ]]; then
-              echo "::error::$repo_output"
-              exit 1
+          if [ $repo_output_status -ne 0 ]; then
+              echo "::error::$repo_output"; exit $repo_output_status
           fi
 
+          set -e
           repo_secrets=$( gh secret list -R "${{ github.repository_owner }}/${{ inputs.repository }}" )
           repo_variables=$( gh variable list -R "${{ github.repository_owner }}/${{ inputs.repository }}" )
 
           for VARIABLE in "AZURE_TENANT_ID" "AZURE_CLIENT_ID"
           do
               if [[ $repo_variables == *"$VARIABLE"* ]]; then
-                  echo "::error::Repository already contains variable '$VARIABLE'."
-                  exit 1
+                  echo "::error::Repository already contains variable '$VARIABLE'."; exit 1
               fi
 
               if [[ $repo_secrets == *"$VARIABLE"* ]]; then
-                  echo "::error::Repository already contains secret '$VARIABLE'."
-                  exit 1
+                  echo "::error::Repository already contains secret '$VARIABLE'."; exit 1
               fi
           done
 
