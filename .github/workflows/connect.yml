@@ -59,7 +59,7 @@ jobs:
           rg_output_status=$?
 
           if [ $rg_output_status -ne 0 ]; then
-              echo "::error::$rg_output"; exit $rg_output_status
+              echo -e "::error::$rg_output"; exit $rg_output_status
           fi
 
       - name: Validate Repository
@@ -71,7 +71,7 @@ jobs:
           repo_output_status=$?
 
           if [ $repo_output_status -ne 0 ]; then
-              echo "::error::$repo_output"; exit $repo_output_status
+              echo -e "::error::$repo_output"; exit $repo_output_status
           fi
 
           set -e
