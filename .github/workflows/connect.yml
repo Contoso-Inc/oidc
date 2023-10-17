@@ -20,7 +20,7 @@ on:
         required: true
         type: string
 
-run-name: Connect repository ${{ inputs.repository }} to resource group ${{ inputs.resourceGroup }}
+run-name: "Repository: '${{ inputs.repository }}' Resource Group: '${{ inputs.resourceGroup }}'"
 
 env:
   DESCRIPTION: Creates a service principal and uses it to configure a repository to enable deployments to azure
@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - run: |
-          echo "### Connecting repository [${{inputs.repository}}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs.resourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
+          echo "### @${{ github.triggering_actor }} would like to connect repository [${{inputs.repository}}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs.resourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
           echo "Triggered by: @${{ github.triggering_actor }}" >> $GITHUB_STEP_SUMMARY
 
   connect:
@@ -61,6 +61,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
         run: |
           gh repo view ${{ github.repository_owner }}/${{ inputs.repository }} --json id,url
+
+      - run: |
+          echo "#### Successfully connected repository [${{inputs.repository}}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs.resourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
+          echo "To use..." >> $GITHUB_STEP_SUMMARY
 
       - name: Done
         run: |
