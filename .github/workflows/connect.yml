@@ -124,7 +124,7 @@ jobs:
 
           az rest --method POST \
               --uri "https://graph.microsoft.com/beta/applications/${{ steps.applicaiton.outputs.id }}/federatedIdentityCredentials" \
-              --body '{"name":"'$credentials_name'","issuer":"https://token.actions.githubusercontent.com","subject":"repo:'${{ env.OIDC_REPOSIOTRY }}'","description":"'${{ steps.applicaiton.outputs.name }}'","audiences":["api://AzureADTokenExchange"]}'
+              --body '{"name":"'$credentials_name'","issuer":"https://token.actions.githubusercontent.com","subject":"repo:'"${{ env.OIDC_REPOSIOTRY }}"'","description":"'"${{ steps.applicaiton.outputs.name }}"'","audiences":["api://AzureADTokenExchange"]}'
 
       - name: Add Role Assignment
         run: |
