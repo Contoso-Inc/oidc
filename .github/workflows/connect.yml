@@ -1,4 +1,7 @@
-name: Connect
+name: Connect OIDC
+
+env:
+  description: Connects a service principal to enable deployments to azure
 
 on:
   workflow_dispatch:
