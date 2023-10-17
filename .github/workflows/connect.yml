@@ -54,13 +54,39 @@ jobs:
 
       - name: Validate Resource Group
         run: |
-          az group show --subscription ${{ inputs.subscription }} -n ${{ inputs.resourceGroup }}
+          rg_output=$( az group show --subscription "${{ inputs.subscription }}" --name "${{ inputs.resourceGroup }}" 2>&1 )
+
+          if [[ $rg_output == *"ResourceGroupNotFound"* ]]; then
+              echo "::error::$rg_output" | head -n 1
+              exit 1
+          fi
 
       - name: Validate Repository
         env:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
         run: |
-          gh repo view ${{ github.repository_owner }}/${{ inputs.repository }} --json id,url
+          repo_output=$( gh repo view "${{ github.repository_owner }}/${{ inputs.repository }}" --json id,url 2>&1 )
+
+          if [[ $repo_output == *"Could not resolve to a Repository"* ]]; then
+              echo "::error::$repo_output"
+              exit 1
+          fi
+
+          repo_secrets=$( gh secret list -R "${{ github.repository_owner }}/${{ inputs.repository }}" )
+          repo_variables=$( gh variable list -R "${{ github.repository_owner }}/${{ inputs.repository }}" )
+
+          for VARIABLE in "AZURE_TENANT_ID" "AZURE_CLIENT_ID"
+          do
+              if [[ $repo_variables == *"$VARIABLE"* ]]; then
+                  echo "::error::Repository already contains variable '$VARIABLE'."
+                  exit 1
+              fi
+
+              if [[ $repo_secrets == *"$VARIABLE"* ]]; then
+                  echo "::error::Repository already contains secret '$VARIABLE'."
+                  exit 1
+              fi
+          done
 
       - run: |
           echo "#### Successfully connected repository [${{inputs.repository}}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs.resourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
