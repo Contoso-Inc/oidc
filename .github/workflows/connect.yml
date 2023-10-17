@@ -1,0 +1,26 @@
+name: Connect
+
+on:
+  workflow_dispatch:
+    inputs:
+      repositoryUri:
+        description: The repository's git url
+        required: true
+        type: string
+
+jobs:
+  build:
+    environment: default
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Try reading secret
+        run: echo ${{ secrets.SUPER_SECRET_AUTH }}
+
+      - name: Read input
+        run: |
+          echo ${{ inputs.repositoryUri }}
+
+      - name: Done
+        run: |
+          echo done.
