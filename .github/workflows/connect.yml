@@ -101,7 +101,7 @@ jobs:
         run: |
           application_name="Dev Platform OIDC ${{ inputs.repository }}"
 
-          application=$(az ad app create --display-name $application_name)
+          application=$(az ad app create --display-name "$application_name")
 
           application_object_id=$(jq -r '.id' <<< "$application")
           application_client_id=$(jq -r '.appId' <<< "$application")
@@ -113,7 +113,7 @@ jobs:
       - name: Create Service Principal
         id: principal
         run: |
-          service_principal=$(az ad sp create --id ${{ steps.applicaiton.outputs.id }})
+          service_principal=$(az ad sp create --id "${{ steps.applicaiton.outputs.id }}")
           service_principal_object_id=$(jq -r '.id' <<< "$service_principal")
 
           echo "id=$service_principal_object_id" >> $GITHUB_OUTPUT
