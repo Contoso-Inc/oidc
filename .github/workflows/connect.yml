@@ -55,91 +55,91 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
 
-      # - name: Validate Resource Group
-      #   run: |
-      #     set +e
-      #     rg_output=$( az group show --subscription "${{ inputs.subscription }}" --name "${{ inputs.resourceGroup }}" 2>&1 )
-      #     rg_output_status=$?
+      - name: Validate Resource Group
+        run: |
+          set +e
+          rg_output=$( az group show --subscription "${{ inputs.subscription }}" --name "${{ inputs.resourceGroup }}" 2>&1 )
+          rg_output_status=$?
 
-      #     if [ $rg_output_status -ne 0 ]; then
-      #         while IFS= read -r line ; do echo "::error::$line"; done <<< "$rg_output"
-      #         exit $rg_output_status
-      #     fi
+          if [ $rg_output_status -ne 0 ]; then
+              while IFS= read -r line ; do echo "::error::$line"; done <<< "$rg_output"
+              exit $rg_output_status
+          fi
 
-      # - name: Validate Repository
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
-      #   run: |
-      #     set +e
-      #     repo_output=$( gh repo view "${{ env.OIDC_REPOSIOTRY }}" --json id,url 2>&1 )
-      #     repo_output_status=$?
+      - name: Validate Repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+        run: |
+          set +e
+          repo_output=$( gh repo view "${{ env.OIDC_REPOSIOTRY }}" --json id,url 2>&1 )
+          repo_output_status=$?
 
-      #     if [ $repo_output_status -ne 0 ]; then
-      #         while IFS= read -r line ; do echo "::error::$line"; done <<< "$repo_output"
-      #         exit $repo_output_status
-      #     fi
+          if [ $repo_output_status -ne 0 ]; then
+              while IFS= read -r line ; do echo "::error::$line"; done <<< "$repo_output"
+              exit $repo_output_status
+          fi
 
-      #     set -e
-      #     repo_secrets=$( gh secret list -R "${{ env.OIDC_REPOSIOTRY }}" )
-      #     repo_variables=$( gh variable list -R "${{ env.OIDC_REPOSIOTRY }}" )
+          set -e
+          repo_secrets=$( gh secret list -R "${{ env.OIDC_REPOSIOTRY }}" )
+          repo_variables=$( gh variable list -R "${{ env.OIDC_REPOSIOTRY }}" )
 
-      #     for VARIABLE in "AZURE_TENANT_ID" "AZURE_CLIENT_ID"
-      #     do
-      #         if [[ $repo_variables == *"$VARIABLE"* ]]; then
-      #             echo "::error::Repository already contains variable '$VARIABLE'."; exit 1
-      #         fi
+          for VARIABLE in "AZURE_TENANT_ID" "AZURE_CLIENT_ID"
+          do
+              if [[ $repo_variables == *"$VARIABLE"* ]]; then
+                  echo "::error::Repository already contains variable '$VARIABLE'."; exit 1
+              fi
 
-      #         if [[ $repo_secrets == *"$VARIABLE"* ]]; then
-      #             echo "::error::Repository already contains secret '$VARIABLE'."; exit 1
-      #         fi
-      #     done
+              if [[ $repo_secrets == *"$VARIABLE"* ]]; then
+                  echo "::error::Repository already contains secret '$VARIABLE'."; exit 1
+              fi
+          done
 
-      # - name: Create Azure AD Applicaiton
-      #   id: applicaiton
-      #   run: |
-      #     application_name="Dev Platform OIDC ${{ inputs.repository }}"
+      - name: Create Azure AD Applicaiton
+        id: applicaiton
+        run: |
+          application_name="Dev Platform OIDC ${{ inputs.repository }}"
 
-      #     application=$(az ad app create --display-name "$application_name")
+          application=$(az ad app create --display-name "$application_name")
 
-      #     application_object_id=$(jq -r '.id' <<< "$application")
-      #     application_client_id=$(jq -r '.appId' <<< "$application")
+          application_object_id=$(jq -r '.id' <<< "$application")
+          application_client_id=$(jq -r '.appId' <<< "$application")
 
-      #     echo "name=$application_name" >> $GITHUB_OUTPUT
-      #     echo "id=$application_object_id" >> $GITHUB_OUTPUT
-      #     echo "appId=$application_client_id" >> $GITHUB_OUTPUT
+          echo "name=$application_name" >> $GITHUB_OUTPUT
+          echo "id=$application_object_id" >> $GITHUB_OUTPUT
+          echo "appId=$application_client_id" >> $GITHUB_OUTPUT
 
-      # - name: Create Service Principal
-      #   id: principal
-      #   run: |
-      #     service_principal=$(az ad sp create --id "${{ steps.applicaiton.outputs.id }}")
-      #     service_principal_object_id=$(jq -r '.id' <<< "$service_principal")
+      - name: Create Service Principal
+        id: principal
+        run: |
+          service_principal=$(az ad sp create --id "${{ steps.applicaiton.outputs.id }}")
+          service_principal_object_id=$(jq -r '.id' <<< "$service_principal")
 
-      #     echo "id=$service_principal_object_id" >> $GITHUB_OUTPUT
+          echo "id=$service_principal_object_id" >> $GITHUB_OUTPUT
 
-      # - name: Create OIDC Creds
-      #   run: |
-      #     credentials_name="DevPlatformOIDC-${{ inputs.repository }}"
+      - name: Create OIDC Creds
+        run: |
+          credentials_name="DevPlatformOIDC-${{ inputs.repository }}"
 
-      #     az rest --method POST \
-      #         --uri "https://graph.microsoft.com/beta/applications/${{ steps.applicaiton.outputs.id }}/federatedIdentityCredentials" \
-      #         --body '{"name":"'$credentials_name'","issuer":"https://token.actions.githubusercontent.com","subject":"repo:'"${{ env.OIDC_REPOSIOTRY }}"'","description":"'"${{ steps.applicaiton.outputs.name }}"'","audiences":["api://AzureADTokenExchange"]}'
+          az rest --method POST \
+              --uri "https://graph.microsoft.com/beta/applications/${{ steps.applicaiton.outputs.id }}/federatedIdentityCredentials" \
+              --body '{"name":"'$credentials_name'","issuer":"https://token.actions.githubusercontent.com","subject":"repo:'"${{ env.OIDC_REPOSIOTRY }}:ref:refs/heads/main"'","description":"'"${{ steps.applicaiton.outputs.name }}"'","audiences":["api://AzureADTokenExchange"]}'
 
-      # - name: Add Role Assignment
-      #   run: |
-      #     az role assignment create \
-      #         --scope ${{ env.AZURE_RESOURCE_GROUP_ID }} \
-      #         --role ${{ env.AZURE_RBAC_ROLE }} \
-      #         --assignee-object-id ${{ steps.principal.outputs.id }} \
-      #         --assignee-principal-type ServicePrincipal
+      - name: Add Role Assignment
+        run: |
+          az role assignment create \
+              --scope ${{ env.AZURE_RESOURCE_GROUP_ID }} \
+              --role ${{ env.AZURE_RBAC_ROLE }} \
+              --assignee-object-id ${{ steps.principal.outputs.id }} \
+              --assignee-principal-type ServicePrincipal
 
-      # - name: Set Repository Variables
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
-      #   run: |
-      #     gh variable set AZURE_TENANT_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ vars.AZURE_TENANT_ID }}"
-      #     gh variable set AZURE_CLIENT_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ steps.applicaiton.outputs.appId }}"
-      #     gh variable set AZURE_SUBSCRIPTION_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ inputs.subscription }}"
-      #     gh variable set AZURE_RESOURCE_GROUP_NAME -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ inputs.resourceGroup }}"
+      - name: Set Repository Variables
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+        run: |
+          gh variable set AZURE_TENANT_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ vars.AZURE_TENANT_ID }}"
+          gh variable set AZURE_CLIENT_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ steps.applicaiton.outputs.appId }}"
+          gh variable set AZURE_SUBSCRIPTION_ID -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ inputs.subscription }}"
+          gh variable set AZURE_RESOURCE_GROUP_NAME -R "${{ env.OIDC_REPOSIOTRY }}" --body "${{ inputs.resourceGroup }}"
 
       - uses: actions/checkout@v4
         with:
