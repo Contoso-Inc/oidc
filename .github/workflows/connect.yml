@@ -23,7 +23,7 @@ on:
 run-name: "Repository: '${{ inputs.repository }}' Resource Group: '${{ inputs.resourceGroup }}'"
 
 env:
-  DESCRIPTION: Creates a service principal and uses it to configure a repository to enable deployments to azure
+  DESCRIPTION: This template enables a repository's workflows to deploy to Azure. It first generates a new deployment identity, grants it the necessary permissions to deploy to a specified resource group, then configures repository to authenticate using OpenID Connect (OIDC). Finally, a sample workflow is added to the repository to demonstrate how to use the new identity.
 
   OIDC_REPOSIOTRY: ${{ github.repository_owner }}/${{ inputs.repository }}
   OIDC_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository_owner }}/${{ inputs.repository }}
