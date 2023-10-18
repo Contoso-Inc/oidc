@@ -23,4 +23,4 @@ jobs:
 
       - name: Show Resource Group
         run: |
-          az group show --subscription ${{ vars.AZURE_SUBSCRIPTION_ID }} --name ${{ vars.AZURE_RESOURCE_GROUP }}
+          az group show --subscription ${{ vars.AZURE_SUBSCRIPTION_ID }} --name ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
