@@ -153,6 +153,7 @@ jobs:
 
       - name: Copy Sample Workflow
         run: |
+          mkdir -p oidc/.github/workflows
           cp main/sample_deploy.yml oidc/.github/workflows/sample_deploy.yml
 
       - name: Commit and Push
