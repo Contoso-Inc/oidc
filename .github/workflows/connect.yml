@@ -8,22 +8,23 @@ on:
   workflow_dispatch:
     inputs:
       repository:
-        description: Name of the repository
+        description: Select a repository
         required: true
         type: string
       subscription:
-        description: Azure subscription id (guid)
+        description: The Azure subscription id (guid) where the resource group exists
         required: true
         type: string
       resourceGroup:
-        description: Name of the resource group
+        description: The name of an existing resource group
         required: true
         type: string
 
 run-name: "Repository: '${{ inputs.repository }}' Resource Group: '${{ inputs.resourceGroup }}'"
 
 env:
-  DESCRIPTION: This template enables a repository's workflows to deploy to Azure. It first generates a new deployment identity, grants it the necessary permissions to deploy to a specified resource group, then configures repository to authenticate using OpenID Connect (OIDC). Finally, a sample workflow is added to the repository to demonstrate how to use the new identity.
+  # this will be used as the description for the template entity in the dev platform
+  description: This template enables a repository's workflows to deploy to Azure. It first generates a new deployment identity, grants it the necessary permissions to deploy to a specified resource group, then configures repository to authenticate using OpenID Connect (OIDC). Finally, a sample workflow is added to the repository to demonstrate how to use the new identity.
 
   OIDC_REPOSIOTRY: ${{ github.repository_owner }}/${{ inputs.repository }}
   OIDC_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository_owner }}/${{ inputs.repository }}
