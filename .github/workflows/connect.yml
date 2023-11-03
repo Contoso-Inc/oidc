@@ -20,7 +20,7 @@ on:
         required: true
         type: string
 
-run-name: "Repository: '${{ inputs.repository }}' Resource Group: '${{ inputs.resourceGroup }}'"
+run-name: "Configure '${{ inputs.repository }}' to deploy to '${{ inputs.resourceGroup }}'"
 
 env:
   # this will be used as the description for the template entity in the dev platform
