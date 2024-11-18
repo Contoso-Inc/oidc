@@ -1,0 +1,176 @@
+name: Connect OIDC
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      _entity_repository_metadata_Name:
+        description: Select a repository
+        required: true
+        type: string
+      _entity_environment_spec_Subscription:
+        description: The Azure subscription id (guid) where the resource group exists
+        required: true
+        type: string
+      _entity_environment_spec_ResourceGroup:
+        description: The name of an existing resource group
+        required: true
+        type: string
+
+run-name: "Configure '${{ inputs._entity_repository_metadata_Name }}' to deploy to '${{ inputs._entity_environment_spec_ResourceGroup }}'"
+
+env:
+  # this will be used as the description for the template entity in the dev platform
+  description: This template enables a repository's workflows to deploy to Azure. It first generates a new deployment identity, grants it the necessary permissions to deploy to a specified resource group, then configures repository to authenticate using OpenID Connect (OIDC). Finally, a sample workflow is added to the repository to demonstrate how to use the new identity.
+
+  OIDC_REPOSITORY: ${{ github.repository_owner }}/${{ inputs._entity_repository_metadata_Name }}
+  OIDC_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository_owner }}/${{ inputs._entity_repository_metadata_Name }}
+
+  AZURE_RBAC_ROLE: Contributor
+  AZURE_RESOURCE_GROUP_ID: /subscriptions/${{ inputs._entity_environment_spec_Subscription }}/resourceGroups/${{ inputs._entity_environment_spec_ResourceGroup }}
+  AZURE_RESOURCE_GROUP_URL: https://portal.azure.com/#@${{ vars.AZURE_TENANT_ID }}/resource/subscriptions/${{ inputs._entity_environment_spec_Subscription }}/resourceGroups/${{ inputs._entity_environment_spec_ResourceGroup }}/overview
+
+jobs:
+  print:
+    name: OIDC Connection Request
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: |
+          echo "### @${{ github.triggering_actor }} would like to connect repository [${{inputs._entity_repository_metadata_Name}}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs._entity_environment_spec_ResourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered by: @${{ github.triggering_actor }}" >> $GITHUB_STEP_SUMMARY
+
+  connect:
+    name: OIDC Connection
+    runs-on: ubuntu-latest
+    environment: default
+
+    steps:
+      - name: Az CLI login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Validate Resource Group
+        run: |
+          set +e
+          rg_output=$( az group show --subscription "${{ inputs._entity_environment_spec_Subscription }}" --name "${{ inputs._entity_environment_spec_ResourceGroup }}" 2>&1 )
+          rg_output_status=$?
+
+          if [ $rg_output_status -ne 0 ]; then
+              while IFS= read -r line ; do echo "::error::$line"; done <<< "$rg_output"
+              exit $rg_output_status
+          fi
+
+      - name: Validate Repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+        run: |
+          set +e
+          repo_output=$( gh repo view "${{ env.OIDC_REPOSITORY }}" --json id,url 2>&1 )
+          repo_output_status=$?
+
+          if [ $repo_output_status -ne 0 ]; then
+              while IFS= read -r line ; do echo "::error::$line"; done <<< "$repo_output"
+              exit $repo_output_status
+          fi
+
+          set -e
+          repo_secrets=$( gh secret list -R "${{ env.OIDC_REPOSITORY }}" )
+          repo_variables=$( gh variable list -R "${{ env.OIDC_REPOSITORY }}" )
+
+          for VARIABLE in "AZURE_TENANT_ID" "AZURE_CLIENT_ID"
+          do
+              if [[ $repo_variables == *"$VARIABLE"* ]]; then
+                  echo "::error::Repository already contains variable '$VARIABLE'."; exit 1
+              fi
+
+              if [[ $repo_secrets == *"$VARIABLE"* ]]; then
+                  echo "::error::Repository already contains secret '$VARIABLE'."; exit 1
+              fi
+          done
+
+      - name: Create Azure AD Application
+        id: application
+        run: |
+          application_name="Dev Platform OIDC ${{ inputs._entity_repository_metadata_Name }}"
+
+          application=$(az ad app create --display-name "$application_name")
+
+          application_object_id=$(jq -r '.id' <<< "$application")
+          application_client_id=$(jq -r '.appId' <<< "$application")
+
+          echo "name=$application_name" >> $GITHUB_OUTPUT
+          echo "id=$application_object_id" >> $GITHUB_OUTPUT
+          echo "appId=$application_client_id" >> $GITHUB_OUTPUT
+
+      - name: Create Service Principal
+        id: principal
+        run: |
+          service_principal=$(az ad sp create --id "${{ steps.application.outputs.id }}")
+          service_principal_object_id=$(jq -r '.id' <<< "$service_principal")
+
+          echo "id=$service_principal_object_id" >> $GITHUB_OUTPUT
+
+      - name: Create OIDC Creds
+        run: |
+          credentials_name="DevPlatformOIDC-${{ inputs._entity_repository_metadata_Name }}"
+
+          az rest --method POST \
+              --uri "https://graph.microsoft.com/beta/applications/${{ steps.application.outputs.id }}/federatedIdentityCredentials" \
+              --body '{"name":"'$credentials_name'","issuer":"https://token.actions.githubusercontent.com","subject":"repo:'"${{ env.OIDC_REPOSITORY }}:ref:refs/heads/main"'","description":"'"${{ steps.application.outputs.name }}"'","audiences":["api://AzureADTokenExchange"]}'
+
+      - name: Add Role Assignment
+        run: |
+          az role assignment create \
+              --scope ${{ env.AZURE_RESOURCE_GROUP_ID }} \
+              --role ${{ env.AZURE_RBAC_ROLE }} \
+              --assignee-object-id ${{ steps.principal.outputs.id }} \
+              --assignee-principal-type ServicePrincipal
+
+      - name: Set Repository Variables
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+        run: |
+          gh variable set AZURE_TENANT_ID -R "${{ env.OIDC_REPOSITORY }}" --body "${{ vars.AZURE_TENANT_ID }}"
+          gh variable set AZURE_CLIENT_ID -R "${{ env.OIDC_REPOSITORY }}" --body "${{ steps.application.outputs.appId }}"
+          gh variable set AZURE_SUBSCRIPTION_ID -R "${{ env.OIDC_REPOSITORY }}" --body "${{ inputs._entity_environment_spec_Subscription }}"
+          gh variable set AZURE_RESOURCE_GROUP_NAME -R "${{ env.OIDC_REPOSITORY }}" --body "${{ inputs._entity_environment_spec_ResourceGroup }}"
+
+      - uses: actions/checkout@v4
+        with:
+          path: main
+
+      - uses: actions/checkout@v4
+        with:
+          path: oidc
+          repository: ${{ env.OIDC_REPOSITORY }}
+          token: ${{ secrets.ORG_GITHUB_TOKEN }}
+
+      - name: Copy Sample Workflow
+        run: |
+          mkdir -p oidc/.github/workflows
+          cp main/sample_deploy.yml oidc/.github/workflows/sample_deploy.yml
+
+      - name: Commit and Push
+        working-directory: oidc
+        run: |
+          git add .github/workflows/sample_deploy.yml
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+          git commit -am "Add sample workflow using OIDC"
+          git push
+
+      - name: Write Summary
+        run: |
+          echo "#### Successfully connected repository [${{ env.OIDC_REPOSITORY }}](${{ env.OIDC_REPOSITORY_URL }}) to Azure resource group [${{ inputs._entity_environment_spec_ResourceGroup }}](${{ env.AZURE_RESOURCE_GROUP_URL }})" >> $GITHUB_STEP_SUMMARY
+          echo "To use..." >> $GITHUB_STEP_SUMMARY
+
+      - name: Done
+        run: |
+          echo done.

@@ -1,0 +1,26 @@
+name: Sample Deploy
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Az CLI login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Show Resource Group
+        run: |
+          az group show --subscription ${{ vars.AZURE_SUBSCRIPTION_ID }} --name ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
